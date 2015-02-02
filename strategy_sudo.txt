@@ -1,0 +1,88 @@
+//When processing the game status, every spot on the game board will be a class object, with name 'm-n', where m represents its column number, n represents its row number. Each object will also have a property called status, which can have the value 'B,W,N', which corresponds to Black ball, White ball, and N/A which indicates a no-ball situation.
+//The notation of O/P-V/H/D-n means there is a detection of Lala's(L)/Opponent's(P) potential connecting four currently with n number of balls present.
+//C-n, represents the nth column, where n ranges from 1 to 7 from left to right
+//R-n, represents the nth row, where n ranges from 1 to 6 from bottom to top
+//#C-n, represents the number of balls in column n
+//#R-n, represents the number of balls in row n
+#define Opp = Opponent-colour;//Black or White depends on initial user input
+#define Lala = Lala-colour;
+
+main(){
+	
+	while ( #C(4) < 5){//if the number of balls in the central column has not exceeded 5
+		if (PV3 == TRUE) return PV3 ; //if it detects one or vertical three, block it
+		else if (PR1H2-3 == TRUE) return PR;// if it detects a horizontal two or three in the first row, block it
+		else return 4;//place ball at central column
+	}
+	
+	
+}	
+	
+analyze(){
+	<....> //the code here identifies 
+}	
+
+//The following function returns the column number(s) which holds opponent's potential connecting four with 2 opponent's balls present
+int* PV2{
+	int array[7] = {0};
+	for(i = 1, i<=7, i++){
+		for (j = 1, j<=3, j++){
+			if (ij.status==Opp && i(j+1).status==Opp && i(j+2).status == N)
+				add i to the array;
+		}
+	}
+	return array;
+}
+
+int *PV3{
+	<...>//the code will construct in similar fashions to PV2
+}
+
+//The following function takes j (representing the column number), and returns the current number of balls in that column
+int #C(j){
+	int sum = 0;
+	for (i == 0, i<=6, i++){
+		if (ji.status !=N) sum++;
+	}
+	return sum;
+}
+
+//The following function takes the potential column number to block as an input, and determines which column to drop the ball based on the following principle: destroy as many opponent's winning sites as possible (first priority), and create as many winning sites for itself as possible()
+int block_best_vertical(column_number_array){
+	int *values = {0};//create an array to store values for each column candidate with the same size of input
+	for each column candidate Ci{
+		int num = Calculate_num_opp();
+		ik.status = L;//change the state of gameboard by assuming the ball is placed into ith column
+		int num2 = Calculate_num_opp();
+		int value = num2-num;//calculate the number of potential site it has blocked
+		values[i] = value;//store the value in the array
+	}
+		if (max(values[])!=0) {
+			get index of the maxmium value;
+			if (there are more than one maxmium value){
+				<...> //the code checks which column can create more winning sites for Lala side
+			}
+			if (there are sill more than one best spot) return random(column_number_array[maxindexes]);//randomly pick a column
+			return column_number_array[maxindex];//return the column index that will block most of the opponent's winning sites
+		}
+	for each column candidate Ci{
+		<...>// check which column can create most winning site for Lala side, the code will be similar to above.
+	}
+	}
+}
+
+
+//The following function calculates all the opponent's potential combinations of getting a connect four 
+int Calculate_num_opp(){
+	//performs horizontal connecting four check
+	int n_h = 0;
+	for (i = 1; i<=7; i++){
+		for (j = 1;j<=6, j++){
+			if (among ij to i(j+3) four spots, # of opponent >=1 && # of Lala == 0) n_h ++;
+		}
+	}
+	
+	<int n_v...>//vertical check, code similar to horizontal check
+	<int n_d...>//diagonal check, with similar code to horizontal check
+	return n_h+n_v+n_d;
+}
