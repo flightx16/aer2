@@ -6,8 +6,8 @@
 #define Tabuki 2
 #define SS 3; //Sensitivity Spot
 #define FS 4; //Forbidden Spot
-#define WS 5; //Warning Spot
-#define WI 6; //Winning Spot
+//#define WS 5; //Warning Spot
+//#define WI 6; //Winning Spot
 #define TRUE 1;
 typedef struct {
 	int Player; // 1-Lala, 2-Tabuki, 0-None
@@ -26,6 +26,7 @@ typedef struct {
 } Piece;
 
 Piece Board[NUM_COL][NUM_ROW];
+int Value[NUM_COL] = {1,1,1,1,1,1,1};
 
 
 
@@ -52,6 +53,7 @@ void reset(){
 			Board[i][j].Sensitivity = NONE;
 			Board[i][j].Forbidden = NONE;
 			Board[i][j].Warning = NONE;
+			Board[i][j].Winning = NONE;
 			Board[i][j].V4 = NONE;
 			Board[i][j].H4 = NONE;
 			Board[i][j].D41 = NONE;
@@ -60,7 +62,11 @@ void reset(){
 	}
 }
 
-
+void Value_reset(){
+	for (int i = 0; i < NUM_COL; i ++){
+		Value[i] = 0;
+	}
+}
 
 //The following function returns the number of row which the piece will be availble to drop
 int check_top_row(int col_num){
@@ -91,14 +97,21 @@ void serial_print_gamestatus(){
 	for (int i = 0; i < NUM_COL; i ++){
         for(int j = 0; j < NUM_ROW; j++){
         	if (Board[i][j].Player !=NONE) Serial.print(Board[i][j].Player);
-        	else if (Board[i][j].Forbidden != NONE) Serial.print(Board[i][j].Forbidden);
-        	else if (Board[i][j].Winning != NONE) Serial.print(Board[i][j].Winning);
-        	else Serial.print(NONE);
+        	else Serial.print(Board[i][j].Sensitivity);
+        	//Serial.print(Board[i][j].Player);
 	  	}
         Serial.print("f");
     }
     Serial.println("E");
 } 
+
+void debug_print_Value(){
+	for (int i = 0; i < NUM_COL; i ++){
+		Serial.print(Value[i]);
+		Serial.print('\t');
+	}
+	Serial.println("End");
+}
 
  int check_button_pressed(){
 	for( int i=0;i<=5;i++){
@@ -163,6 +176,8 @@ int strategy(){
 	if (emergency_block_col_num >= 0 && emergency_block_col_num < NUM_COL) {digitalWrite(8, HIGH); return emergency_block_col_num;}
 	emergency_block_col_num = trap_2();
 	if (emergency_block_col_num >= 0 && emergency_block_col_num < NUM_COL) {digitalWrite(8, HIGH); return emergency_block_col_num;}
+	emergency_block_col_num = trap_3();
+	if (emergency_block_col_num >= 0 && emergency_block_col_num < NUM_COL) {digitalWrite(8, HIGH); return emergency_block_col_num;}
 	if (Board[3][4].Player == NONE) return 3;
 	emergency_block_col_num = drop_vertical_three();
 	if (emergency_block_col_num >= 0 && emergency_block_col_num < NUM_COL) {digitalWrite(9, HIGH); return emergency_block_col_num;}
@@ -171,39 +186,95 @@ int strategy(){
 	emergency_block_col_num = drop_horizontal_three();
 	if (emergency_block_col_num >= 0 && emergency_block_col_num < NUM_COL) {digitalWrite(9, HIGH); return emergency_block_col_num;}
 	/*******************///selection begins
-	emergency_block_col_num = drop_warning();
-	if (emergency_block_col_num >= 0 && emergency_block_col_num < NUM_COL) {digitalWrite(10, HIGH); return emergency_block_col_num;}
-	emergency_block_col_num = drop_winning();
-	if (emergency_block_col_num >= 0 && emergency_block_col_num < NUM_COL) {digitalWrite(11, HIGH); return emergency_block_col_num;}
-	
-	//selection
-	int Value[NUM_COL] = {1,1,1,1,1,1,1};
+	int col_num_optimium = col_selection();
+	if (col_num_optimium >= 0 && col_num_optimium < NUM_COL) {digitalWrite(13, HIGH); return col_num_optimium;}
+//	emergency_block_col_num = drop_warning();
+//	if (emergency_block_col_num >= 0 && emergency_block_col_num < NUM_COL) {digitalWrite(10, HIGH); return emergency_block_col_num;}
+//	emergency_block_col_num = drop_winning();
+//	if (emergency_block_col_num >= 0 && emergency_block_col_num < NUM_COL) {digitalWrite(11, HIGH); return emergency_block_col_num;}
+	return 1;
+}
+
+int col_sel_tool(){
+	//debug_print_Value();
+	//Serial.println("Before anything");
+	for (int i = 0; i < NUM_COL; i ++){
+		if (Value[i]!= 0){
+			Value[i] = Value[i] + Board[i][check_top_row(i)].Warning + Board[i][check_top_row(i)].Winning;
+		}
+	}
+	//debug_print_Value();
+	//Serial.println("After add warning and winning");
+	int max_temp = Value[0];
+	int max_index = 0;
+	for (int i = 1; i <NUM_COL; i ++){
+		if (Value[i] > max_temp) {max_temp = Value[i]; max_index = i;}
+	}
+	if (max_temp == 0) return col_selection2();
+	for (int i = 0; i < NUM_COL ; i ++){
+		if (Value[i] == max_temp) Value[i] = 1;
+		else Value[i] = 0;
+	}
+	//debug_print_Value();
+	//Serial.println("Before enter random");
+	return random_col();
+}
+
+int col_selection(){
+		//selection
 	for (int i = 0; i < NUM_COL; i ++){
 		if (check_top_row(i) == NUM_ROW) Value[i] = 0;
-		else {
-			if (Board[i][check_top_row(i)].Forbidden == 4) Value[i] = 0;
-			if (Board[i][check_top_row(i)].Sensitivity == 4) Value[i] = 0;
+		else if (Board[i][check_top_row(i)].Forbidden == 4) Value[i] = 0;
+		else if (Board[i][check_top_row(i)].Sensitivity == 3) Value[i] = 0;
+		else Value[i] = 1;
+	}
+	for (int i = 0; i < NUM_COL; i ++){
+		if (Value[i]!= 0){
+			Value[i] = Value[i] + Board[i][check_top_row(i)].Warning + Board[i][check_top_row(i)].Winning;
 		}
 	}
-	int no_move = Value[0] || Value[1] || Value[2] || Value[3] || Value[4] || Value[5] || Value[6];
-	if (no_move != 0){
-		int randomcol = random(0, NUM_COL);
-		while (Value[randomcol] == 0){
-			randomcol = random(0, NUM_COL);
-		}
-		digitalWrite(12, HIGH);
-		return randomcol;
+	int max_temp = Value[0];
+	int max_index = 0;
+	for (int i = 1; i <NUM_COL; i ++){
+		if (Value[i] > max_temp) {max_temp = Value[i]; max_index = i;}
 	}
-	
+	if (max_temp == 0) return col_selection2();
+	for (int i = 0; i < NUM_COL ; i ++){
+		if (Value[i] == max_temp) Value[i] = 1;
+		else Value[i] = 0;
+	}
+	return random_col();
+}
 
+int col_selection2(){
+	for (int i = 0; i < NUM_COL; i ++){
+		if (check_top_row(i) == NUM_ROW) Value[i] = 0;
+		else Value[i] = 1;
+	}
+	for (int i = 0; i < NUM_COL; i ++){
+		if (Value[i]!= 0){
+			Value[i] = Value[i] + Board[i][check_top_row(i)].Winning + Board[i][check_top_row(i)].Warning;
+		}
+	}
+	int max_temp = Value[0];
+	int max_index = 0;
+	for (int i = 1; i <NUM_COL; i ++){
+		if (Value[i] > max_temp) {max_temp = Value[i]; max_index = i;}
+	}
+	for (int i = 0; i < NUM_COL ; i ++){
+		if (Value[i] == max_temp) Value[i] = 1;
+		else Value[i] = 0;
+	}
+	return random_col();
+}
+
+int random_col(){
 	int randomcol = random(0,NUM_COL);
-	while (check_top_row(randomcol)== NUM_ROW){
+	while (Value[randomcol] == 0){
 		randomcol = random(0,NUM_COL);
 	}
+	//digitalWrite(13, HIGH);
 	return randomcol;
-	
-
-	//return 1;
 }
 
 void refresh(){
@@ -328,13 +399,18 @@ void identify_warning_hor(){
 //mark forbidden zone for a connecting four sequence beginning at row_num, col_num
 void markwarning_hor(int col_num, int row_num){
 	int Tabuki_spot_num = 0;
+	int none_spot_num = 0;
 	for(int i=col_num; i<col_num + 4; i++){
 	    if (Board[i][row_num].Player == Lala || Board[i][row_num].H4 == 1) return ;
-	    else if (Board[i][row_num].Player == Tabuki) Tabuki_spot_num++;
+	    else if (Board[i][row_num].Player == Tabuki) {
+	    	Tabuki_spot_num++;
+	    	if (Board[i][row_num - 1].Player == NONE) none_spot_num ++;
+	    }
 	}
-	if (Tabuki_spot_num >=2 ){
+	if (Tabuki_spot_num ==2){
 		for(int i=col_num; i<col_num + 4; i++){
-			if (Board[i][row_num].Player == NONE ) { Board[i][row_num].Warning = WS;}
+			if (Board[i][row_num].Player == NONE) Board[i][row_num].Warning++;
+			if (none_spot_num == 1 && Board[i][row_num - 1].Player!= NONE) { Board[i][row_num].Warning++;}
 		}
 	}	
 }
@@ -354,14 +430,19 @@ void identify_warning_dia(){
 
 void markwarning_dia1(int col_num, int row_num){
 	char Tabuki_spot_num = 0;
+	int none_spot_num = 0;
 	for(int i=0; i< 4; i++){
 	    if (Board[col_num + i][row_num + i].Player == Lala|| Board[col_num + i][row_num + i].D41 == 1) return ;
-	    else if (Board[col_num + i][row_num + i].Player == Tabuki) Tabuki_spot_num++;
+	    else if (Board[col_num + i][row_num + i].Player == Tabuki) {
+	    	Tabuki_spot_num++;
+	    	if (Board[col_num + i][row_num + i - 1].Player == NONE) none_spot_num++;
+	    }
 	}
-	if (Tabuki_spot_num >=2){
+	if (Tabuki_spot_num ==2){
 		for(int i=0; i< 4; i++){
 			if (Board[col_num + i][row_num + i].Player == NONE) {
-				Board[col_num + i][row_num + i].Warning = WS;
+				Board[col_num + i][row_num + i].Warning++;
+				if (none_spot_num == 1 && Board[col_num + i][ row_num + i - 1].Player!= NONE){Board[col_num + i][row_num + i].Warning ++;}
 			}
 		}
 	}	
@@ -369,14 +450,19 @@ void markwarning_dia1(int col_num, int row_num){
 
 void markwarning_dia2(int col_num, int row_num){
 	char Tabuki_spot_num = 0;
+	int none_spot_num = 0;
 	for(int i=0; i< 4; i++){
 	    if (Board[col_num - i][row_num + i].Player == Lala || Board[col_num - i][row_num + i].D42 == 1) return ;
-	    else if (Board[col_num - i][row_num + i].Player == Tabuki) Tabuki_spot_num++;
+	    else if (Board[col_num - i][row_num + i].Player == Tabuki) {
+	    	Tabuki_spot_num++;
+	    	if (Board[col_num - i][row_num + i - 1].Player != NONE) none_spot_num++;
+		}
 	}
-	if (Tabuki_spot_num >=2){
+	if (Tabuki_spot_num ==2){
 		for(int i=0; i< 4; i++){
 			if (Board[col_num - i][row_num + i].Player == NONE ) {
-				Board[col_num - i][row_num + i].Warning = WS;
+				Board[col_num - i][row_num + i].Warning++;
+				if (none_spot_num == 1 && Board[col_num - i][row_num + i - 1].Player != NONE){Board[col_num - i][row_num + i].Warning++;}
 			}
 		}
 	}	
@@ -389,20 +475,21 @@ void identify_Winning_hor(){
 		}
 	}
 }
-//mark forbidden zone for a connecting four sequence beginning at row_num, col_num
+//mark winning zone for a connecting four sequence beginning at row_num, col_num
 void markWinning_hor(int col_num, int row_num){
 	int Lala_spot_num = 0;
-	//int none_spot_num = 0;
+	int none_spot_num = 0;
 	for(int i=col_num; i<col_num + 4; i++){
 	    if (Board[i][row_num].Player == Tabuki || Board[i][row_num].LH4 == 1) return ;
 	    else if (Board[i][row_num].Player == Lala) {
 	    	Lala_spot_num++;
-	    	//if (Board[i][row_num - 1].Player == NONE) none_spot_num++;
+	    	if (Board[i][row_num - 1].Player == NONE) none_spot_num++;
 	    }
 	}
 	if (Lala_spot_num ==2 ){
 		for(int i=col_num; i<col_num + 4; i++){
-			if (Board[i][row_num].Player == NONE && Board[i][row_num - 1].Player != NONE) { Board[i][row_num].Winning = WI;}
+			if (Board[i][row_num].Player == NONE) Board[i][row_num].Winning ++;
+			if (none_spot_num == 1 && Board[i][row_num - 1].Player != NONE)  Board[i][row_num].Winning ++;
 		}
 	}	
 }
@@ -427,22 +514,23 @@ void identify_Winning_dia(){
 
 void markWinning_dia1(int col_num, int row_num){
 	int Lala_spot_num = 0;
-	//int none_spot_num = 0;
+	int none_spot_num = 0;
 	for(int i=0; i< 4; i++){
 	    if (Board[col_num + i][row_num + i].Player == Tabuki|| Board[col_num + i][row_num + i].LD41 == 1) return ;
 	    else if (Board[col_num + i][row_num + i].Player == Lala) {
 	    	Lala_spot_num++;
-	    	//if (row_num + i >0 && Board[col_num + i][row_num + i - 1].Player == NONE) none_spot_num ++;
+	    	if (row_num + i >0 && Board[col_num + i][row_num + i - 1].Player == NONE) none_spot_num ++;
 	    }
 	}
 	if (Lala_spot_num ==2){
 		for(int i=0; i< 4; i++){
 			if (Board[col_num + i][row_num + i].Player == NONE ) {
+				if (none_spot_num == 1 && Board[col_num + i][row_num + i - 1].Player!= NONE) Board[col_num + i][row_num + i].Winning ++;
 				if (row_num + i == 0) {
-					Board[col_num+i][row_num + i].Winning = WI;
+					Board[col_num+i][row_num + i].Winning ++;
 				}
 				else {
-					if (Board[col_num + i][row_num + i - 1].Player != NONE) Board[col_num + i][row_num + i].Winning = WI;
+					if (Board[col_num + i][row_num + i - 1].Player != NONE) Board[col_num + i][row_num + i].Winning ++;
 				}
 			}
 		}
@@ -451,22 +539,23 @@ void markWinning_dia1(int col_num, int row_num){
 
 void markWinning_dia2(int col_num, int row_num){
 	char Lala_spot_num = 0;
-	//int none_spot_num = 0;
+	int none_spot_num = 0;
 	for(int i=0; i< 4; i++){
 	    if (Board[col_num - i][row_num + i].Player == Tabuki || Board[col_num - i][row_num + i].LD42 == 1) return ;
 	    else if (Board[col_num - i][row_num + i].Player == Lala) {
 	    	Lala_spot_num++;
-	    	//if (row_num + i > 0 && Board[col_num + i][row_num + i - 1].Player == NONE) none_spot_num ++;
+	    	if (row_num + i > 0 && Board[col_num + i][row_num + i - 1].Player == NONE) none_spot_num ++;
 	    }
 	}
 	if (Lala_spot_num ==2){
 		for(int i=0; i< 4; i++){
 			if (Board[col_num - i][row_num + i].Player == NONE ) {
+				if (none_spot_num == 1 && Board[col_num - i][row_num + i - 1].Player!= NONE) Board[col_num - i][row_num + i].Winning ++;
 				if (row_num + i == 0) {
-					Board[col_num + i][row_num + i].Winning = WI;
+					Board[col_num - i][row_num + i].Winning ++;
 				}
 				else {
-					if (Board[col_num + i][row_num + i - 1].Player != NONE) Board[col_num - i][row_num + i].Winning = WI;
+					if (Board[col_num - i][row_num + i - 1].Player != NONE) Board[col_num - i][row_num + i].Winning ++;
 				}
 			}
 		}
@@ -618,40 +707,39 @@ void markSensitivity_dia2(int col_num, int row_num){
 int block_vertical_three(){
 	char num_block = 0;
 	int blockv3_col_num;
+	Value_reset();
 	for (int i = 0; i < NUM_COL; i ++){
-		if (Board[i][2].Player == Lala || Board[i][3].Player == Lala) continue;
+		if (Board[i][2].Player == Lala || Board[i][3].Player == Lala) {continue;}
 		for (int j = 0; j < 3; j ++){
 			if (Board[i][j].Player == Tabuki && Board[i][j+1].Player == Tabuki && Board[i][j+2].Player == Tabuki && Board[i][j+3].Player == NONE 
-				&& Board[i][j].V4 == 0 && Board[i][j+1].V4 == 0 && Board[i][j+2].V4 == 0 && Board[i][j+3].V4 == 0) {num_block++; blockv3_col_num = i;}
+				&& Board[i][j].V4 == 0 && Board[i][j+1].V4 == 0 && Board[i][j+2].V4 == 0 && Board[i][j+3].V4 == 0) { num_block ++; Value[i] = 1;}
 		}
 	}
-	//if (num_block > 1) call selection function and then return from selection function
-	//else if (num_block == 1) return block_col_num;
-	if (num_block > 1) return blockv3_col_num;
-	if (num_block == 1) return blockv3_col_num;
+	if (num_block >= 1) return col_sel_tool();
 	return 8;
 }
 
 int block_diagonal_three(){
+	Value_reset();
 	char num_block = 0;
 	int blockd3_col_num;
 	int col_offset;
 	for (int i = 0; i < 4; i ++){
 		for (int j = 0; j <3; j ++){
 			col_offset = check_diagonal_three1(i,j);
-			if (col_offset != 4) {num_block++; blockd3_col_num = i + col_offset ;}
+			if (col_offset != 4) {num_block++; blockd3_col_num = i + col_offset ; Value[blockd3_col_num] = 1;}
 		}
 	}
 	for(int i = 3; i < NUM_COL; i ++){
 		for (int j = 0; j < 3; j ++){
 			col_offset = check_diagonal_three2(i,j);
-			if (col_offset != 4) {num_block++; blockd3_col_num = i - col_offset ;}
+			if (col_offset != 4) {num_block++; blockd3_col_num = i - col_offset ; Value[blockd3_col_num] = 1;}
 		}
 	}
 	//if (num_block > 1) call selection function and then return from selection function
 	//else if (num_block == 1) return blockd3_col_num;
-	if (num_block > 1) return blockd3_col_num;
-	if (num_block == 1) return blockd3_col_num;
+	if (num_block >= 1) return col_sel_tool();
+	//if (num_block == 1) return blockd3_col_num;
 	return 8;
 }
 
@@ -684,6 +772,7 @@ int check_diagonal_three2(int col_num, int row_num){
 }
 
 int block_horizontal_three(){
+	Value_reset();
 	char num_block = 0;
 	int blockh3_col_num;
 	for (int j = 0; j <NUM_ROW; j++){
@@ -696,13 +785,13 @@ int block_horizontal_three(){
 			}
 			if (Tabuki_spot_num == 3){
 				for(int k = 0; k < 4; k ++){
-					if (Board[i+k][j].Player == NONE && (j == 0 || Board[i+k][j - 1].Player != NONE )) {num_block ++; blockh3_col_num = i+k;}
+					if (Board[i+k][j].Player == NONE && (j == 0 || Board[i+k][j - 1].Player != NONE )) {num_block ++; blockh3_col_num = i+k; Value[blockh3_col_num] = 1;}
 				}
 			}
 		}
 	}
-	if (num_block > 1) return blockh3_col_num;//cal  selection
-	else if (num_block == 1) return blockh3_col_num;
+	if (num_block >= 1) return col_sel_tool();//cal  selection
+	//else if (num_block == 1) return blockh3_col_num;
 	return 8;
 }
 
@@ -806,8 +895,19 @@ int trap_1(){
 }
 
 int trap_2(){
+	if (Board[2][0].Player == NONE && Board[3][0].Player == Tabuki && Board[4][0].Player == Tabuki && Board[5][0].Player == NONE && Board[6][0].Player == NONE) return 5;
 	if (Board[1][0].Player == NONE && Board[2][0].Player == Tabuki && Board[3][0].Player == Tabuki && Board[4][0].Player == NONE && Board[5][0].Player == NONE) return 4;
+	if (Board[0][0].Player == NONE && Board[1][0].Player == Tabuki && Board[2][0].Player == Tabuki && Board[3][0].Player == NONE && Board[4][0].Player == NONE) return 3;
+	if (Board[2][0].Player == NONE && Board[3][0].Player == NONE && Board[4][0].Player == Tabuki && Board[5][0].Player == Tabuki && Board[6][0].Player == NONE) return 1;
 	if (Board[1][0].Player == NONE && Board[2][0].Player == NONE && Board[3][0].Player == Tabuki && Board[4][0].Player == Tabuki && Board[5][0].Player == NONE) return 2;
+	if (Board[0][0].Player == NONE && Board[1][0].Player == NONE && Board[2][0].Player == Tabuki && Board[3][0].Player == Tabuki && Board[4][0].Player == NONE) return 3;
+	return 8;
+}
+
+int trap_3(){
+	if (Board[0][0].Player == NONE && Board[1][0].Player == Tabuki && Board[2][0].Player == NONE && Board[3][0].Player == Tabuki && Board[4][0].Player == NONE) return 2;
+	if (Board[1][0].Player == NONE && Board[2][0].Player == Tabuki && Board[3][0].Player == NONE && Board[4][0].Player == Tabuki && Board[5][0].Player == NONE) return 3;
+	if (Board[2][0].Player == NONE && Board[3][0].Player == Tabuki && Board[4][0].Player == NONE && Board[5][0].Player == Tabuki && Board[6][0].Player == NONE) return 4;
 	return 8;
 }
 
